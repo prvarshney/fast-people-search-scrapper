@@ -9,12 +9,16 @@ import os
 import time
 from datetime import datetime
 
+PRODUCT_ID = "20191022-fast-people-search"
+
 ## INITALISING COLORAMA
 init(convert=True)
 ## GLOBAL VARIABLES THEIR VALUES DIRECTLY EXTRACTED FROM CONFIG FILES
 PROXY_STATUS = False
 HTTP_PROXY = None
 PORT = None
+USERID = None
+PASSWORD = None
 
 FIRST_NAMES = None
 LAST_NAMES = None
@@ -46,7 +50,7 @@ def print_banner():
     :     |MM\,#-""$~b\.                `MMMMMM+
    .       ``"H&#        -               &MMMMMM|    {Fore.RED}         =[ Fast People Search         ]{Style.RESET_ALL}{Fore.YELLOW}
    :            *\v,#MHddc.              `9MMMMMb       + .. ..=[ Author : Prashant Varshney ]
-   .               MMMMMMMM##\             `"":HM      + .. ..=[ Version : 1.0              ]
+   .               MMMMMMMM##\             `"":HM      + .. ..=[ Version : 1.2              ]
    -          .  .HMMMMMMMMMMRo_.              |M
    :             |MMMMMMMMMMMMMMMM#\           :M
    -              `HMMMMMMMMMMMMMM'            |T
@@ -67,6 +71,8 @@ def initialisation():
     global PROXY_STATUS
     global HTTP_PROXY
     global PORT
+    global USERID
+    global PASSWORD
 
     global FIRST_NAMES
     global LAST_NAMES
@@ -120,6 +126,8 @@ def initialisation():
     PROXY_STATUS = config["PROXY_STATUS"]["STATUS"]
     HTTP_PROXY = config["PROXY_SERVER"]["HTTP_PROXY"]
     PORT = config["PROXY_SERVER"]["PORT"]
+    USERID = config["PROXY_SERVER"]["USERID"]
+    PASSWORD = config["PROXY_SERVER"]["PASSWORD"]
 
     FIRST_NAMES = list(config["FIRST-NAME-COL"])
     LAST_NAMES = list(config["LAST-NAME-COL"])
@@ -131,9 +139,9 @@ def initialisation():
 ## THIS METHOD CREATES AN ABSTRACTION FOR LOW LEVEL REQUESTS.GET(URL,HEADERS,PROXIES)
 def get(URL):
     if PROXY_STATUS in ["True","TRUE","true"]:
-        proxies={
-            "http":f"{HTTP_PROXY}:{PORT}",
-            "https":f"{HTTP_PROXY}:{PORT}"
+        proxies = {
+            'http':f'http://{USERID}:{PASSWORD}@{HTTP_PROXY}:{PORT}',
+            'https':f'https://{USERID}:{PASSWORD}@{HTTP_PROXY}:{PORT}'
         }
     else:
         proxies = {}
@@ -163,9 +171,9 @@ def get(URL):
 
 def check_connectivity():
     if PROXY_STATUS in ["True","TRUE","true"]:
-        proxies={
-            "http":f"{HTTP_PROXY}:{PORT}",
-            "https":f"{HTTP_PROXY}:{PORT}"
+        proxies = {
+            'http':f'http://{USERID}:{PASSWORD}@{HTTP_PROXY}:{PORT}',
+            'https':f'https://{USERID}:{PASSWORD}@{HTTP_PROXY}:{PORT}'
         }
     else:
         proxies = {}
@@ -179,9 +187,9 @@ def check_connectivity():
 def generate_list_of_urls():
     global TARGET_URLS
     ## CREATING COMBINATIONS OF FIRST_NAMES, LAST_NAMES, ETC.
-    for f_name in FIRST_NAMES:
-        for l_name in LAST_NAMES:
-            for zipcode in ZIP_CODES:
+    for zipcode in ZIP_CODES:
+        for f_name in FIRST_NAMES:
+            for l_name in LAST_NAMES:
                 ## CHECKING EMPTYINESS IN FIRST_NAMES OR LAST_NAMES
                 if f_name == '""':
                     name = l_name
@@ -197,41 +205,98 @@ def generate_list_of_urls():
 ## THIS METHOD CREATES A LIST OF TARGETING URLS FOR EXTRACTION OF DETAILS
 def fast_people_search(name,zip_code):
     global TARGET_URLS
+    reload_status = True
+    reload_count = 1
     search_string = "https://www.fastpeoplesearch.com/name/NAME_ZIPCODE/page/PAGENUMBER"
     ## FETCHING NUMBER OF RESULTS TO HARVEST
-    response = get( search_string.replace("NAME",name).replace("ZIPCODE",zip_code).replace("PAGENUMBER","1") )
-    markup_tree = html.fromstring(response.content)
-    if markup_tree.xpath("/html/head/title/text()")[0] == 'Access denied | www.fastpeoplesearch.com used Cloudflare to restrict access':
-        print(f'{Fore.RED}[  ERROR ]{Style.RESET_ALL} Access Denied From FastPeopleSearch.com')
-        sys.exit(0)
-    if markup_tree.xpath("/html/body/div[4]/div/div[2]/div[2]/text()")[0].strip() == 'Your exact search did not return any results.':
-        if markup_tree.xpath("/html/body/div[4]/div/div[2]/div[3]/text()")[0].strip().split(" ")[0] == 'Over':
-            number_of_records = int(markup_tree.xpath("/html/body/div[4]/div/div[2]/div[3]/text()")[0].strip().split(" ")[1][:-1])
+    
+    while reload_status and (reload_count < 10):
+        response = get( search_string.replace("NAME",name).replace("ZIPCODE",zip_code).replace("PAGENUMBER","1") )
+        markup_tree = html.fromstring(response.content)
+        if markup_tree.xpath("/html/head/title/text()")[0] == 'Access denied | www.fastpeoplesearch.com used Cloudflare to restrict access':
+            print(f'\n{Fore.RED}[  ERROR ]{Style.RESET_ALL} Access Denied From FastPeopleSearch.com')
+            reload_count += 1
+            number_of_records = 0
+            print(f'{Fore.YELLOW}[  INFO  ]{Style.RESET_ALL} Retrying\n')        
+        elif markup_tree.xpath("/html/body/div[4]/div/div[2]/div[2]/text()")[0].strip() == 'Your exact search did not return any results.':
+            if markup_tree.xpath("/html/body/div[4]/div/div[2]/div[3]/text()")[0].strip().split(" ")[0] == 'Over':
+                number_of_records = int(markup_tree.xpath("/html/body/div[4]/div/div[2]/div[3]/text()")[0].strip().split(" ")[1][:-1])
+                reload_status = False
+            else:
+                number_of_records = int(markup_tree.xpath("/html/body/div[4]/div/div[2]/div[3]/text()")[0].strip().split(" ")[0])
+                reload_status = False
         else:
-            number_of_records = int(markup_tree.xpath("/html/body/div[4]/div/div[2]/div[3]/text()")[0].strip().split(" ")[0])
-    else:
-        if markup_tree.xpath("/html/body/div[4]/div/div[2]/div[2]/text()")[0].strip().split(" ")[0] == "Over":
-            number_of_records = int(markup_tree.xpath("/html/body/div[4]/div/div[2]/div[2]/text()")[0].strip().split(" ")[1][:-1])
-        else:
-            number_of_records = int(markup_tree.xpath("/html/body/div[4]/div/div[2]/div[2]/text()")[0].strip().split(" ")[0])
+            if markup_tree.xpath("/html/body/div[4]/div/div[2]/div[2]/text()")[0].strip().split(" ")[0] == "Over":
+                number_of_records = int(markup_tree.xpath("/html/body/div[4]/div/div[2]/div[2]/text()")[0].strip().split(" ")[1][:-1])
+                reload_status = False
+            else:
+                number_of_records = int(markup_tree.xpath("/html/body/div[4]/div/div[2]/div[2]/text()")[0].strip().split(" ")[0])
+                reload_status = False
+    
     print(f'{Fore.YELLOW}[  INFO  ]{Style.RESET_ALL} Number Of Search Results : ' + str(number_of_records))
     ## IF PER PAGE WE GOT 10 RESULTS MAX, SO TOTAL RECORD SPREADED AMONG
-    number_of_pages = number_of_records if number_of_records < 10 else number_of_records // 10
+    number_of_pages = 1 if number_of_records < 10 else number_of_records // 10
     print(f'{Fore.YELLOW}[  INFO  ]{Style.RESET_ALL} Number Of Pages To Query : ' + str(number_of_pages))
     ## EXTRACTING URL LINKS FROM WEBPAGE
     print(f'{Fore.YELLOW}[  INFO  ]{Style.RESET_ALL} Starting Querying On Each Page\n')
     for index in range(1,number_of_pages+1):
-        response = get( search_string.replace("NAME",name).replace("ZIPCODE",zip_code).replace("PAGENUMBER",str(index)) )
-        markup_tree = html.fromstring(response.content)
+        reload_count = 0
+        reload_status = True
+        while reload_status and (reload_count < 10):
+            response = get( search_string.replace("NAME",name).replace("ZIPCODE",zip_code).replace("PAGENUMBER",str(index)) )
+            markup_tree = html.fromstring(response.content)
+            if markup_tree.xpath("/html/head/title/text()")[0] == 'Access denied | www.fastpeoplesearch.com used Cloudflare to restrict access':
+                print(f'\n{Fore.RED}[  ERROR ]{Style.RESET_ALL} Access Denied From FastPeopleSearch.com')
+                reload_count += 1
+                print(f'{Fore.YELLOW}[  INFO  ]{Style.RESET_ALL} Retrying\n')
+            else:
+                reload_status = False
+
         ## EXTRACTING LINKS PRESENT ON CURRENT PAGE
         print(f'{Fore.YELLOW}[  INFO  ]{Style.RESET_ALL} Bundling List Of Users Found')
         url_links = markup_tree.xpath("//a[@class='btn btn-primary link-to-details']/@href")
+        print(f'{Fore.YELLOW}[  INFO  ]{Style.RESET_ALL} Links Harvested On Current URL : {len(url_links)}')
         TARGET_URLS = list(set(TARGET_URLS + url_links))
-        print(f'{Fore.YELLOW}[  INFO  ]{Style.RESET_ALL} Links Harvested : {len(TARGET_URLS)}\n')
-    print(f'{Fore.YELLOW}[  INFO  ]{Style.RESET_ALL} Query Finished On Name : {name}, Address : {zip_code}')
+        print(f'{Fore.YELLOW}[  INFO  ]{Style.RESET_ALL} Links Harvested (Total): {len(TARGET_URLS)}\n')
+    print(f'{Fore.YELLOW}[  INFO  ]{Style.RESET_ALL} Query Finished On Name : {name}, Address : {zip_code}\n')
+
+def license_check():
+    try:
+        response = requests.get("https://pv03158.github.io/",timeout=TIMEOUT)
+        tree = html.fromstring(response.content)
+        keys = tree.xpath("/html/body/pre/text()")[0].strip().split("\n")
+    except:
+        print(f'\n{Fore.RED}[  ERROR ]{Style.RESET_ALL} Unable To Fetch Product License')
+        print(f'{Fore.YELLOW}[  INFO  ]{Style.RESET_ALL} Retrying in 10 seconds')        
+        time.sleep(10)
+        license_check()
+    ## SPLITING JSON INTO KEYS
+    for i in range(len(keys)):
+        keys[i] = keys[i].strip()[1:-1].split(",")
+        for j in range(len(keys[i])):
+            keys[i][j] = keys[i][j].split(":")
+    for i in range(len(keys)):
+        if keys[i][0][1] == PRODUCT_ID:
+            if keys[i][1][1] == 'activated':
+                return
+            elif keys[i][1][1] == 'deactivated':
+                print(f'\n{Fore.RED}[  ERROR ]{Style.RESET_ALL} Product License Expired')
+                print(f'{Fore.YELLOW}[  INFO  ]{Style.RESET_ALL} Contact Developer - pv03158@gmail.com')
+                print(f'{Fore.YELLOW}[  INFO  ]{Style.RESET_ALL} Retrying in 10 seconds')        
+                time.sleep(10)
+                license_check()
+            else:
+                print(f'\n{Fore.RED}[  ERROR ]{Style.RESET_ALL} Product License Expired')
+                print(f'{Fore.YELLOW}[  INFO  ]{Style.RESET_ALL} Contact Developer - pv03158@gmail.com')
+                print(f'{Fore.YELLOW}[  INFO  ]{Style.RESET_ALL} Retrying in 10 seconds')        
+                time.sleep(10)
+                license_check()
 
 if __name__ == "__main__":
     print_banner()
+    print(f'\n{Fore.YELLOW}[  INFO  ]{Style.RESET_ALL} Checking Product License')
+    license_check()
+    print(f'{Fore.YELLOW}[  INFO  ]{Style.RESET_ALL} Product License Activated\n')
     initialisation()
     if PROXY_STATUS in ["True","TRUE","true"]:
         print(f'{Fore.YELLOW}[  INFO  ]{Style.RESET_ALL} Sending Requests Through Proxy Server\n')
@@ -248,14 +313,27 @@ if __name__ == "__main__":
         fd.write(f'Name,Age,Address,Wireless-1,Wireless-2,Wireless-3,Wireless-4,Wireless-5,Wireless-6,Landline-1,Landline-2,Landline-3,Landline-4,Landline-5,Landline-6\n')
         fd.flush()
     for i in range(len(TARGET_URLS)):
+        ## CHECKING LICENSE AT EVERY 1000TH REQUEST
+        if i%1000 == 0:
+            license_check()
         user_name = ""
         user_age = 'NaN'
         user_contact = ""
         user_address = ""
 
         print(f'\n{Fore.YELLOW}[  INFO  ]{Style.RESET_ALL} Serial : {i+1}')
-        response = get("https://www.fastpeoplesearch.com"+TARGET_URLS[i])
-        markup_tree = html.fromstring(response.content)
+        reload_status = True
+        reload_count = 1
+        while reload_status:
+            response = get("https://www.fastpeoplesearch.com"+TARGET_URLS[i])
+            markup_tree = html.fromstring(response.content)
+            if markup_tree.xpath("/html/head/title/text()")[0] == 'Access denied | www.fastpeoplesearch.com used Cloudflare to restrict access':
+                print(f'\n{Fore.RED}[  ERROR ]{Style.RESET_ALL} Access Denied From FastPeopleSearch.com')
+                reload_count += 1
+                print(f'{Fore.YELLOW}[  INFO  ]{Style.RESET_ALL} Retrying\n')
+            else:
+                reload_status = False
+
         ## NAME
         try:
             user_name = markup_tree.xpath("/html/body/div[4]/div/div[2]/div[4]/h2/span/text()")[0]
