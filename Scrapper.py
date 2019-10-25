@@ -49,8 +49,8 @@ def print_banner():
      -   TTM|     >..                   \HMMMMH
     :     |MM\,#-""$~b\.                `MMMMMM+
    .       ``"H&#        -               &MMMMMM|    {Fore.RED}         =[ Fast People Search         ]{Style.RESET_ALL}{Fore.YELLOW}
-   :            *\v,#MHddc.              `9MMMMMb       + .. ..=[ Author : Prashant Varshney ]
-   .               MMMMMMMM##\             `"":HM      + .. ..=[ Version : 1.2              ]
+   :            **v,#MHddc.              `9MMMMMb      + .. ..=[ Version : 1.2  Licensed    ] 
+   .               MMMMMMMM##\             `"":HM      
    -          .  .HMMMMMMMMMMRo_.              |M
    :             |MMMMMMMMMMMMMMMM#\           :M
    -              `HMMMMMMMMMMMMMM'            |T
@@ -260,43 +260,9 @@ def fast_people_search(name,zip_code):
         print(f'{Fore.YELLOW}[  INFO  ]{Style.RESET_ALL} Links Harvested (Total): {len(TARGET_URLS)}\n')
     print(f'{Fore.YELLOW}[  INFO  ]{Style.RESET_ALL} Query Finished On Name : {name}, Address : {zip_code}\n')
 
-def license_check():
-    try:
-        response = requests.get("https://pv03158.github.io/",timeout=TIMEOUT)
-        tree = html.fromstring(response.content)
-        keys = tree.xpath("/html/body/pre/text()")[0].strip().split("\n")
-    except:
-        print(f'\n{Fore.RED}[  ERROR ]{Style.RESET_ALL} Unable To Fetch Product License')
-        print(f'{Fore.YELLOW}[  INFO  ]{Style.RESET_ALL} Retrying in 10 seconds')        
-        time.sleep(10)
-        license_check()
-    ## SPLITING JSON INTO KEYS
-    for i in range(len(keys)):
-        keys[i] = keys[i].strip()[1:-1].split(",")
-        for j in range(len(keys[i])):
-            keys[i][j] = keys[i][j].split(":")
-    for i in range(len(keys)):
-        if keys[i][0][1] == PRODUCT_ID:
-            if keys[i][1][1] == 'activated':
-                return
-            elif keys[i][1][1] == 'deactivated':
-                print(f'\n{Fore.RED}[  ERROR ]{Style.RESET_ALL} Product License Expired')
-                print(f'{Fore.YELLOW}[  INFO  ]{Style.RESET_ALL} Contact Developer - pv03158@gmail.com')
-                print(f'{Fore.YELLOW}[  INFO  ]{Style.RESET_ALL} Retrying in 10 seconds')        
-                time.sleep(10)
-                license_check()
-            else:
-                print(f'\n{Fore.RED}[  ERROR ]{Style.RESET_ALL} Product License Expired')
-                print(f'{Fore.YELLOW}[  INFO  ]{Style.RESET_ALL} Contact Developer - pv03158@gmail.com')
-                print(f'{Fore.YELLOW}[  INFO  ]{Style.RESET_ALL} Retrying in 10 seconds')        
-                time.sleep(10)
-                license_check()
 
 if __name__ == "__main__":
     print_banner()
-    print(f'\n{Fore.YELLOW}[  INFO  ]{Style.RESET_ALL} Checking Product License')
-    license_check()
-    print(f'{Fore.YELLOW}[  INFO  ]{Style.RESET_ALL} Product License Activated\n')
     initialisation()
     if PROXY_STATUS in ["True","TRUE","true"]:
         print(f'{Fore.YELLOW}[  INFO  ]{Style.RESET_ALL} Sending Requests Through Proxy Server\n')
@@ -314,8 +280,6 @@ if __name__ == "__main__":
         fd.flush()
     for i in range(len(TARGET_URLS)):
         ## CHECKING LICENSE AT EVERY 1000TH REQUEST
-        if i%1000 == 0:
-            license_check()
         user_name = ""
         user_age = 'NaN'
         user_contact = ""
